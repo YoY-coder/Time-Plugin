@@ -13,6 +13,9 @@ TimeAudioProcessor::TimeAudioProcessor()
 {
     startNewSession();
 
+    if (auto settings = openGlobalSettings())
+        darkMode.store (settings->getBoolValue ("darkMode", false));
+
     // Sonde d'activité toutes les 250 ms. Le comptage vit ici, dans le
     // processeur : il continue même quand la fenêtre du plugin est fermée.
     startTimer (250);
@@ -201,6 +204,27 @@ void TimeAudioProcessor::resetAll()
     startNewSession();
 }
 
+std::unique_ptr<juce::PropertiesFile> TimeAudioProcessor::openGlobalSettings()
+{
+    juce::PropertiesFile::Options options;
+    options.applicationName     = "Time";
+    options.filenameSuffix      = ".settings";
+    options.folderName          = "Time";
+    options.osxLibrarySubFolder = "Application Support";
+    return std::make_unique<juce::PropertiesFile> (options);
+}
+
+void TimeAudioProcessor::setDarkMode (bool shouldBeDark)
+{
+    darkMode.store (shouldBeDark);
+
+    if (auto settings = openGlobalSettings())
+    {
+        settings->setValue ("darkMode", shouldBeDark);
+        settings->saveIfNeeded();
+    }
+}
+
 juce::Point<int> TimeAudioProcessor::getSavedEditorSize() const
 {
     return { editorWidth.load(), editorHeight.load() };
@@ -231,6 +255,7 @@ void TimeAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     root.setAttribute ("formatVersion", stateFormatVersion);
     root.setAttribute ("paused",        clock.isPaused());
     root.setAttribute ("priorSeconds",  priorSeconds);
+    root.setAttribute ("darkMode",      darkMode.load());
     root.setAttribute ("editorWidth",   editorWidth.load());
     root.setAttribute ("editorHeight",  editorHeight.load());
 
@@ -326,6 +351,9 @@ void TimeAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
     priorSeconds = std::max (0.0, xml->getDoubleAttribute ("priorSeconds", 0.0));
 
     clock.setPaused (xml->getBoolAttribute ("paused", false), monotonicNow());
+
+    if (xml->hasAttribute ("darkMode"))
+        darkMode.store (xml->getBoolAttribute ("darkMode"));
 
     editorWidth.store  (juce::jlimit (200, 4000, xml->getIntAttribute ("editorWidth",  defaultWidth)));
     editorHeight.store (juce::jlimit (150, 4000, xml->getIntAttribute ("editorHeight", defaultHeight)));

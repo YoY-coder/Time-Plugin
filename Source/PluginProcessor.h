@@ -90,6 +90,9 @@ public:
     void setPriorSeconds (double seconds);
     void resetAll();
 
+    bool isDarkMode() const noexcept    { return darkMode.load(); }
+    void setDarkMode (bool shouldBeDark);
+
     juce::Point<int> getSavedEditorSize() const;
     void setSavedEditorSize (int width, int height);
 
@@ -134,6 +137,10 @@ private:
     std::atomic<int> editorWidth  { defaultWidth };
     std::atomic<int> editorHeight { defaultHeight };
     std::atomic<bool> sizeRestoreRequested { false };
+    std::atomic<bool> darkMode { false };
+
+    // Dernier thème choisi, mémorisé sur l'ordinateur (pour les nouveaux projets)
+    static std::unique_ptr<juce::PropertiesFile> openGlobalSettings();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TimeAudioProcessor)
 };

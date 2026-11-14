@@ -74,6 +74,15 @@ private:
 };
 
 //==============================================================================
+/** Petit bouton rond soleil / lune pour passer du mode clair au mode sombre. */
+class ThemeToggle final : public juce::Button
+{
+public:
+    ThemeToggle() : juce::Button ("Theme") {}
+    void paintButton (juce::Graphics&, bool isMouseOver, bool isButtonDown) override;
+};
+
+//==============================================================================
 class TimeAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                        private juce::Timer,
                                        private juce::ListBoxModel
@@ -83,6 +92,7 @@ public:
     ~TimeAudioProcessorEditor() override;
 
     void paint (juce::Graphics&) override;
+    void paintOverChildren (juce::Graphics&) override;
     void resized() override;
 
     void openSheet (Sheet::Mode mode);
@@ -98,6 +108,8 @@ private:
     void timerCallback() override;
     void setExpanded (bool shouldExpand);
     void restoreSavedSize();
+    void applyTheme();
+    void rebuildTextures();
     void updateResizeLimits();
     juce::Rectangle<float> unit (float x, float y, float w, float h) const;
 
@@ -115,6 +127,7 @@ private:
 
     juce::TextButton pauseButton, correctButton, priorButton, resetButton;
     DisclosureButton sessionsButton;
+    ThemeToggle themeButton;
     juce::ListBox historyList;
     std::unique_ptr<Sheet> sheet;
 
@@ -122,7 +135,9 @@ private:
     bool applyingSize = false;
     float scale = 1.0f;
     juce::Point<float> origin;
-    juce::Image shadowCache;
+    bool darkMode = false;
+    juce::Image backdropCache, grainCache;   // textures pré-calculées
+    float textureScale = 1.0f;               // densité de pixels de l'écran
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TimeAudioProcessorEditor)
 };

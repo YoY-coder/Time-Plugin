@@ -50,7 +50,7 @@ Fonctionnement technique :
 
 ### Sauvegarde
 
-Tout est enregistré **dans le projet du DAW** : sessions, ajustements, temps antérieur, état de pause et taille de la fenêtre. Le format porte un numéro de version, ce qui permettra de le faire évoluer.
+Tout est enregistré **dans le projet du DAW** : sessions, ajustements, temps antérieur, état de pause, mode clair/sombre et taille de la fenêtre. Le format porte un numéro de version, ce qui permettra de le faire évoluer.
 
 - ⚠️ **La session en cours n'est conservée que si vous enregistrez le projet**, comme n'importe quel réglage de plugin. Si vous fermez sans enregistrer, cette session est perdue.
 - Un **« Enregistrer sous »** (v2 d'un projet) conserve tout le temps cumulé.
@@ -71,6 +71,7 @@ Tout est enregistré **dans le projet du DAW** : sessions, ajustements, temps an
   - **Temps antérieur** : le temps déjà passé sur un projet commencé avant d'avoir Time. Il apparaît comme une ligne distincte. Pour le modifier, rouvrez ce bouton ou cliquez sur la ligne dans l'historique. Mettez 0 pour le supprimer.
   - **Reset** : remet tout à zéro, après une fenêtre de confirmation.
 - **Sessions ▸** : déplie l'historique (sessions, ajustements, temps antérieur), le plus récent en haut, avec défilement. La fenêtre s'agrandit vers le bas, puis reprend sa taille quand vous repliez la liste. L'historique est replié par défaut.
+- **Mode clair / sombre** : le petit bouton rond ☀︎ / ☾ en haut à droite de la carte bascule entre le blanc cassé et le gris-noir. Le choix est enregistré dans le projet, et le dernier choix est repris pour les nouveaux projets.
 - **Fenêtre redimensionnable** par le coin en bas à droite. Tout s'adapte proportionnellement, et la taille est mémorisée dans le projet.
 - Les champs de saisie ont aussi des boutons **− / +**. Si votre DAW intercepte le clavier, vous pouvez régler les valeurs à la souris.
 
@@ -308,7 +309,8 @@ Source/
   PluginProcessor.h/.cpp    Audio (passe-plat), détection de lecture, sonde 250 ms,
                             sessions / ajustements / temps antérieur, sauvegarde XML
   PluginEditor.h/.cpp       Interface : chrono, état, boutons, panneaux, historique
-  TimeLookAndFeel.h/.cpp    Couleurs, polices, dessin des boutons
+  TimeLookAndFeel.h/.cpp    Thèmes clair / sombre, polices, boutons, textures
+                            (fissures, poussières, halo, grain) générées par code
 Tests/
   LiveClockTests.cpp        Tests automatiques de la logique du chrono
 ```
@@ -322,4 +324,4 @@ cmake --build build-tests --config Release --target TimeTests
 
 Lancez ensuite l'exécutable `TimeTests` généré.
 
-Format de sauvegarde : un élément XML `TIME`, avec `formatVersion="1"`, les attributs `paused`, `priorSeconds`, `editorWidth` et `editorHeight`, et les enfants `SESSIONS/SESSION` (`id`, `start`, `end`, `seconds`) et `ADJUSTMENTS/ADJUSTMENT` (`id`, `time`, `seconds`). Les heures sont en millisecondes depuis 1970.
+Format de sauvegarde : un élément XML `TIME`, avec `formatVersion="1"`, les attributs `paused`, `darkMode`, `priorSeconds`, `editorWidth` et `editorHeight`, et les enfants `SESSIONS/SESSION` (`id`, `start`, `end`, `seconds`) et `ADJUSTMENTS/ADJUSTMENT` (`id`, `time`, `seconds`). Les heures sont en millisecondes depuis 1970.

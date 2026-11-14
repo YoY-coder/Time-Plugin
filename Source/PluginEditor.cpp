@@ -196,24 +196,24 @@ juce::Rectangle<float> Sheet::getCardBounds() const
 
 void Sheet::paint (juce::Graphics& g)
 {
-    g.fillAll (juce::Colours::black.withAlpha (0.18f));
+    g.fillAll (juce::Colours::black.withAlpha (themeFor (*this).dark ? 0.45f : 0.16f));
 
     const auto card = getCardBounds();
     juce::Path p;
     p.addRoundedRectangle (card, 14.0f * scale);
     juce::DropShadow (juce::Colours::black.withAlpha (0.18f), juce::roundToInt (24 * scale), { 0, juce::roundToInt (6 * scale) })
         .drawForPath (g, p);
-    g.setColour (Palette::card);
+    g.setColour (themeFor (*this).card);
     g.fillPath (p);
 
     const float s = scale;
     auto inner = card.reduced (20.0f * s, 16.0f * s);
 
-    g.setColour (Palette::text);
+    g.setColour (themeFor (*this).text);
     g.setFont (uiFont (16.0f * s, FontWeight::Medium));
     g.drawText (title, inner.removeFromTop (24.0f * s), juce::Justification::centredLeft, true);
 
-    g.setColour (Palette::secondary);
+    g.setColour (themeFor (*this).secondary);
     g.setFont (uiFont (12.5f * s));
     g.drawFittedText (message, inner.removeFromTop (38.0f * s).toNearestInt(),
                       juce::Justification::topLeft, 3, 0.9f);
@@ -313,7 +313,7 @@ void DisclosureButton::paintButton (juce::Graphics& g, bool isMouseOver, bool)
         chevron.lineTo (chevronArea.getX() + chevronArea.getWidth() * 0.25f, chevronArea.getBottom());
     }
 
-    const auto colour = isMouseOver ? Palette::accent.darker (0.15f) : Palette::accent;
+    const auto colour = isMouseOver ? themeFor (*this).accent.darker (0.15f) : themeFor (*this).accent;
     g.setColour (colour);
     g.strokePath (chevron, juce::PathStrokeType (juce::jmax (1.2f, h * 0.06f), juce::PathStrokeType::curved,
                                                  juce::PathStrokeType::rounded));
@@ -321,9 +321,48 @@ void DisclosureButton::paintButton (juce::Graphics& g, bool isMouseOver, bool)
     g.setFont (uiFont (h * 0.40f, FontWeight::Medium));
     g.drawText ("Sessions", r, juce::Justification::centredLeft);
 
-    g.setColour (Palette::secondary);
+    g.setColour (themeFor (*this).secondary);
     g.setFont (uiFont (h * 0.36f));
     g.drawText (countText, r, juce::Justification::centredRight);
+}
+
+//==============================================================================
+//  ThemeToggle
+//==============================================================================
+void ThemeToggle::paintButton (juce::Graphics& g, bool isMouseOver, bool isButtonDown)
+{
+    const auto& T = themeFor (*this);
+    auto r = getLocalBounds().toFloat().reduced (1.0f);
+
+    g.setColour (isButtonDown ? T.controlHover.darker (0.05f) : (isMouseOver ? T.controlHover : T.control));
+    g.fillEllipse (r);
+
+    const auto c = r.getCentre();
+    const float rad = r.getWidth() * 0.2f;
+    g.setColour (isMouseOver ? T.accent : T.secondary);
+
+    if (T.dark)
+    {
+        // Lune : disque "mordu" par un second disque de la couleur du fond
+        g.fillEllipse (juce::Rectangle<float> (rad * 2.3f, rad * 2.3f).withCentre (c));
+        g.setColour (isMouseOver ? T.controlHover : T.control);
+        g.fillEllipse (juce::Rectangle<float> (rad * 2.1f, rad * 2.1f).withCentre (c + juce::Point<float> (rad * 0.75f, -rad * 0.6f)));
+    }
+    else
+    {
+        // Soleil : disque + 8 rayons
+        g.fillEllipse (juce::Rectangle<float> (rad * 1.5f, rad * 1.5f).withCentre (c));
+        juce::Path rays;
+        for (int i = 0; i < 8; ++i)
+        {
+            const float a = (float) i * juce::MathConstants<float>::pi / 4.0f;
+            const juce::Point<float> d (std::cos (a), std::sin (a));
+            rays.startNewSubPath (c + d * rad * 1.25f);
+            rays.lineTo (c + d * rad * 1.75f);
+        }
+        g.strokePath (rays, juce::PathStrokeType (juce::jmax (1.0f, rad * 0.28f), juce::PathStrokeType::curved,
+                                                  juce::PathStrokeType::rounded));
+    }
 }
 
 //==============================================================================
@@ -332,6 +371,8 @@ void DisclosureButton::paintButton (juce::Graphics& g, bool isMouseOver, bool)
 TimeAudioProcessorEditor::TimeAudioProcessorEditor (TimeAudioProcessor& p)
     : AudioProcessorEditor (&p), processor (p)
 {
+    darkMode = processor.isDarkMode();
+    lookAndFeel.setDarkMode (darkMode);
     setLookAndFeel (&lookAndFeel);
     setOpaque (true);
 
@@ -351,6 +392,10 @@ TimeAudioProcessorEditor::TimeAudioProcessorEditor (TimeAudioProcessor& p)
         addAndMakeVisible (b);
 
     addAndMakeVisible (sessionsButton);
+
+    themeButton.setTooltip ("Mode clair / sombre");
+    themeButton.onClick = [this] { processor.setDarkMode (! processor.isDarkMode()); applyTheme(); };
+    addAndMakeVisible (themeButton);
 
     historyList.setModel (this);
     historyList.setRowSelectedOnMouseDown (false);
@@ -382,6 +427,46 @@ void TimeAudioProcessorEditor::updateResizeLimits()
         setResizeLimits (330, (int) std::ceil (210.0f * baseHeightExpanded / baseHeightCollapsed), 2400, 2400);
     else
         setResizeLimits (330, 210, 2400, 1600);
+}
+
+void TimeAudioProcessorEditor::applyTheme()
+{
+    darkMode = processor.isDarkMode();
+    lookAndFeel.setDarkMode (darkMode);
+    sendLookAndFeelChange();
+    rebuildTextures();
+    repaint();
+}
+
+void TimeAudioProcessorEditor::rebuildTextures()
+{
+    const auto& T = lookAndFeel.getTheme();
+    const int w = juce::jmax (1, getWidth());
+    const int h = juce::jmax (1, getHeight());
+
+    // Rendu à la densité réelle de l'écran (Retina, Windows 150 %…) pour rester net
+    textureScale = juce::jlimit (2.0f, 3.0f, juce::Component::getApproximateScaleFactorForComponent (this));
+    const int pw = juce::roundToInt ((float) w * textureScale);
+    const int ph = juce::roundToInt ((float) h * textureScale);
+
+    backdropCache = juce::Image (juce::Image::RGB, pw, ph, true);
+    {
+        juce::Graphics g (backdropCache);
+        g.addTransform (juce::AffineTransform::scale (textureScale));
+
+        Texture::paintBackdrop (g, getLocalBounds().toFloat(), scale, T);
+
+        // Ombres douces des cartes
+        const juce::DropShadow shadow (juce::Colours::black.withAlpha (T.shadowAlpha),
+                                       juce::roundToInt (22.0f * scale), { 0, juce::roundToInt (6.0f * scale) });
+        juce::Path cards;
+        cards.addRoundedRectangle (unit (16, 16, 408, 248), 14.0f * scale);
+        if (expanded)
+            cards.addRoundedRectangle (unit (16, 274, 408, 220), 14.0f * scale);
+        shadow.drawForPath (g, cards);
+    }
+
+    grainCache = Texture::makeGrain (pw, ph, T);
 }
 
 void TimeAudioProcessorEditor::restoreSavedSize()
@@ -463,33 +548,40 @@ void TimeAudioProcessorEditor::resized()
         sheet->setScale (scale);
     }
 
-    // Ombres des cartes, pré-calculées (coûteuses à dessiner à chaque image)
-    shadowCache = juce::Image (juce::Image::ARGB, juce::jmax (1, getWidth()), juce::jmax (1, getHeight()), true);
-    {
-        juce::Graphics g (shadowCache);
-        const juce::DropShadow shadow (juce::Colours::black.withAlpha (0.07f),
-                                       juce::roundToInt (18.0f * scale), { 0, juce::roundToInt (4.0f * scale) });
-        juce::Path cards;
-        cards.addRoundedRectangle (unit (16, 16, 408, 248), 14.0f * scale);
-        if (expanded)
-            cards.addRoundedRectangle (unit (16, 274, 408, 220), 14.0f * scale);
-        shadow.drawForPath (g, cards);
-    }
+    themeButton.setBounds (unit (390.0f, 26.0f, 24.0f, 24.0f).toNearestInt());
+
+    rebuildTextures();
 }
 
 void TimeAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    g.fillAll (Palette::background);
-    g.drawImageAt (shadowCache, 0, 0);
-
+    const auto& T = themeFor (*this);
     const float s = scale;
 
+    // Fond texturé (fissures, poussières, halo) + ombres
+    g.drawImageTransformed (backdropCache, juce::AffineTransform::scale (1.0f / textureScale));
+
+    auto drawCard = [&] (juce::Rectangle<float> r)
+    {
+        // Carte légèrement translucide : on devine les fissures du fond au travers
+        g.setColour (T.card.withAlpha (T.dark ? 0.84f : 0.80f));
+        g.fillRoundedRectangle (r, 14.0f * s);
+
+        // Lumière venant du haut : léger dégradé + liseré
+        juce::ColourGradient sheen (juce::Colours::white.withAlpha (T.dark ? 0.035f : 0.5f), r.getX(), r.getY(),
+                                    juce::Colours::white.withAlpha (0.0f), r.getX(), r.getY() + r.getHeight() * 0.5f, false);
+        g.setGradientFill (sheen);
+        g.fillRoundedRectangle (r, 14.0f * s);
+
+        g.setColour (T.cardEdge);
+        g.drawRoundedRectangle (r.reduced (0.5f), 14.0f * s, 1.0f);
+    };
+
     // Carte principale
-    g.setColour (Palette::card);
-    g.fillRoundedRectangle (unit (16, 16, 408, 248), 14.0f * s);
+    drawCard (unit (16, 16, 408, 248));
 
     // Légende
-    g.setColour (Palette::secondary);
+    g.setColour (themeFor (*this).secondary);
     g.setFont (uiFont (10.5f * s, FontWeight::Medium));
     g.drawText ("TEMPS DE TRAVAIL", unit (16, 30, 408, 16), juce::Justification::centred);
 
@@ -497,15 +589,18 @@ void TimeAudioProcessorEditor::paint (juce::Graphics& g)
     paintStatus (g, unit (16, 124, 408, 24));
 
     // Séparateur au-dessus de "Sessions"
-    g.setColour (Palette::separator);
+    g.setColour (themeFor (*this).separator);
     g.fillRect (unit (32, 212, 376, 1).withHeight (juce::jmax (1.0f, s * 0.75f)));
 
     // Carte de l'historique
     if (expanded)
-    {
-        g.setColour (Palette::card);
-        g.fillRoundedRectangle (unit (16, 274, 408, 220), 14.0f * s);
-    }
+        drawCard (unit (16, 274, 408, 220));
+}
+
+void TimeAudioProcessorEditor::paintOverChildren (juce::Graphics& g)
+{
+    // Grain de film très léger sur l'ensemble : texture sans bruit visuel
+    g.drawImageTransformed (grainCache, juce::AffineTransform::scale (1.0f / textureScale));
 }
 
 void TimeAudioProcessorEditor::paintChrono (juce::Graphics& g, juce::Rectangle<float> area) const
@@ -535,7 +630,7 @@ void TimeAudioProcessorEditor::paintChrono (juce::Graphics& g, juce::Rectangle<f
     totalW *= k;
 
     g.setFont (drawFont);
-    g.setColour (snapshot.paused ? Palette::secondary : Palette::text);
+    g.setColour (snapshot.paused ? themeFor (*this).secondary : themeFor (*this).text);
 
     float x = area.getCentreX() - totalW * 0.5f;
     for (auto c : text)
@@ -555,14 +650,14 @@ void TimeAudioProcessorEditor::paintStatus (juce::Graphics& g, juce::Rectangle<f
 
     switch (snapshot.state)
     {
-        case LiveClock::State::Active:   colour = Palette::green;  label = "Actif"; break;
-        case LiveClock::State::Playing:  colour = Palette::blue;   label = "Lecture"; break;
-        case LiveClock::State::Waiting:  colour = Palette::orange;
+        case LiveClock::State::Active:   colour = themeFor (*this).green;  label = "Actif"; break;
+        case LiveClock::State::Playing:  colour = themeFor (*this).blue;   label = "Lecture"; break;
+        case LiveClock::State::Waiting:  colour = themeFor (*this).orange;
             label = fr ("Inactif · ") + formatMinSec (snapshot.pendingSeconds) + fr (" en attente · retrait dans ")
                   + formatMinSec (snapshot.secondsBeforeDiscard);
             break;
-        case LiveClock::State::Stopped:  colour = Palette::grey;   label = fr ("Arrêté · en attente d'activité"); break;
-        case LiveClock::State::Paused:   colour = Palette::grey;   label = "En pause"; break;
+        case LiveClock::State::Stopped:  colour = themeFor (*this).grey;   label = fr ("Arrêté · en attente d'activité"); break;
+        case LiveClock::State::Paused:   colour = themeFor (*this).grey;   label = "En pause"; break;
     }
 
     const float s = scale;
@@ -573,15 +668,27 @@ void TimeAudioProcessorEditor::paintStatus (juce::Graphics& g, juce::Rectangle<f
     const float pillW = juce::jmin (area.getWidth(), textW + dot + 7.0f * s + padX * 2.0f);
     const auto pill = area.withSizeKeepingCentre (pillW, area.getHeight());
 
-    g.setColour (colour.withAlpha (0.12f));
+    const auto& T = themeFor (*this);
+    g.setColour (colour.withAlpha (T.dark ? 0.16f : 0.12f));
     g.fillRoundedRectangle (pill, pill.getHeight() * 0.5f);
 
     auto inner = pill.reduced (padX, 0.0f);
+    const auto dotArea = inner.removeFromLeft (dot).withSizeKeepingCentre (dot, dot);
+
+    // Point lumineux, avec un halo comme une braise
+    if (snapshot.state != LiveClock::State::Paused && snapshot.state != LiveClock::State::Stopped)
+    {
+        const auto c = dotArea.getCentre();
+        juce::ColourGradient halo (colour.withAlpha (0.45f), c.x, c.y, colour.withAlpha (0.0f), c.x + dot * 1.4f, c.y, true);
+        g.setGradientFill (halo);
+        g.fillEllipse (dotArea.expanded (dot * 0.9f));
+    }
+
     g.setColour (colour);
-    g.fillEllipse (inner.removeFromLeft (dot).withSizeKeepingCentre (dot, dot));
+    g.fillEllipse (dotArea);
     inner.removeFromLeft (7.0f * s);
 
-    g.setColour (colour.darker (0.35f));
+    g.setColour (T.dark ? colour.brighter (0.25f) : colour.darker (0.35f));
     g.setFont (font);
     g.drawText (label, inner, juce::Justification::centredLeft, true);
 }
@@ -590,6 +697,9 @@ void TimeAudioProcessorEditor::timerCallback()
 {
     if (processor.consumeSizeRestoreRequest())
         restoreSavedSize();
+
+    if (processor.isDarkMode() != darkMode)
+        applyTheme();
 
     snapshot = processor.getSnapshot();
 
@@ -653,7 +763,7 @@ void TimeAudioProcessorEditor::paintListBoxItem (int row, juce::Graphics& g, int
     auto r = juce::Rectangle<float> (0, 0, (float) width, (float) height).reduced (10.0f * s, 0);
 
     juce::String titleText, detail, duration;
-    juce::Colour durationColour = Palette::text;
+    juce::Colour durationColour = themeFor (*this).text;
 
     switch (item.kind)
     {
@@ -661,7 +771,7 @@ void TimeAudioProcessorEditor::paintListBoxItem (int row, juce::Graphics& g, int
             titleText = "Session en cours";
             detail    = formatDate (item.startMs) + fr (" · ") + formatClock (item.startMs) + fr (" → maintenant");
             duration  = formatDuration (item.seconds, false);
-            durationColour = Palette::accent;
+            durationColour = themeFor (*this).accent;
             break;
 
         case HistoryRow::Kind::Session:
@@ -674,7 +784,7 @@ void TimeAudioProcessorEditor::paintListBoxItem (int row, juce::Graphics& g, int
             titleText = "Ajustement";
             detail    = formatDate (item.startMs) + fr (" · ") + formatClock (item.startMs);
             duration  = (item.seconds < 0 ? fr ("− ") : juce::String ("+ ")) + formatDuration (item.seconds, false);
-            durationColour = Palette::secondary;
+            durationColour = themeFor (*this).secondary;
             break;
 
         case HistoryRow::Kind::Prior:
@@ -692,17 +802,17 @@ void TimeAudioProcessorEditor::paintListBoxItem (int row, juce::Graphics& g, int
     auto top = r.withTrimmedBottom (r.getHeight() * 0.5f);
     auto bottom = r.withTrimmedTop (r.getHeight() * 0.5f);
 
-    g.setColour (Palette::text);
+    g.setColour (themeFor (*this).text);
     g.setFont (uiFont (13.0f * s, FontWeight::Medium));
     g.drawText (titleText, top.withTrimmedTop (2.0f * s), juce::Justification::bottomLeft, true);
 
-    g.setColour (Palette::secondary);
+    g.setColour (themeFor (*this).secondary);
     g.setFont (uiFont (11.0f * s));
     g.drawText (detail, bottom.withTrimmedBottom (2.0f * s).withTrimmedTop (2.0f * s), juce::Justification::topLeft, true);
 
     if (row < getNumRows() - 1)
     {
-        g.setColour (Palette::separator);
+        g.setColour (themeFor (*this).separator);
         g.fillRect (juce::Rectangle<float> (10.0f * s, (float) height - 1.0f, (float) width - 20.0f * s, 1.0f));
     }
 }
