@@ -59,6 +59,7 @@ Tout est enregistré **dans le projet du DAW** : sessions, ajustements, temps an
 
 ## 2. L'interface
 
+- **Logo chronomètre** et nom « Time » en haut à gauche, pour identifier le plugin d'un coup d'œil.
 - **Chrono total** en HH:MM:SS au centre. Les chiffres sont à chasse fixe : ils ne bougent pas en défilant.
 - **Indicateur d'état** sous le chrono :
   - 🟢 **Actif**

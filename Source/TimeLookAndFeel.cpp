@@ -337,3 +337,65 @@ juce::Image Texture::makeGrain (int width, int height, const Theme& T)
 
     return img;
 }
+
+//==============================================================================
+//  Logo chronomètre
+//==============================================================================
+void drawStopwatchLogo (juce::Graphics& g, juce::Rectangle<float> area, const Theme& T)
+{
+    const float u = juce::jmin (area.getWidth(), area.getHeight()) / 24.0f;   // grille 24 x 24
+    const auto  o = area.withSizeKeepingCentre (24.0f * u, 24.0f * u).getTopLeft();
+    auto P = [&] (float x, float y) { return juce::Point<float> (o.x + x * u, o.y + y * u); };
+
+    const auto centre = P (12.0f, 13.5f);
+    const float radius = 8.2f * u;
+    const float stroke = 1.7f * u;
+    const auto  body   = T.text.withAlpha (0.88f);
+
+    // Halo braise discret derrière le cadran
+    juce::ColourGradient halo (T.accent.withAlpha (T.dark ? 0.30f : 0.16f), centre.x, centre.y,
+                               T.accent.withAlpha (0.0f), centre.x + radius * 1.6f, centre.y, true);
+    g.setGradientFill (halo);
+    g.fillEllipse (juce::Rectangle<float> (radius * 3.2f, radius * 3.2f).withCentre (centre));
+
+    // Boîtier
+    g.setColour (body);
+    g.drawEllipse (juce::Rectangle<float> (radius * 2.0f, radius * 2.0f).withCentre (centre), stroke);
+
+    // Couronne (bouton du haut) + tige
+    g.fillRoundedRectangle (juce::Rectangle<float> (P (9.6f, 1.6f), P (14.4f, 3.4f)), 0.8f * u);
+    g.fillRect (juce::Rectangle<float> (P (11.2f, 3.0f), P (12.8f, 5.6f)));
+
+    // Bouton latéral (en haut à droite)
+    {
+        juce::Path side;
+        side.addRoundedRectangle (-1.3f * u, -0.8f * u, 2.6f * u, 1.6f * u, 0.5f * u);
+        const float a = juce::degreesToRadians (45.0f);
+        const auto  p = centre + juce::Point<float> (std::sin (a), -std::cos (a)) * (radius + 1.6f * u);
+        g.fillPath (side, juce::AffineTransform::rotation (a).translated (p));
+    }
+
+    // Graduations : 12, 3, 6, 9 h
+    for (int i = 0; i < 4; ++i)
+    {
+        const float a = (float) i * juce::MathConstants<float>::halfPi;
+        const juce::Point<float> d (std::sin (a), -std::cos (a));
+        juce::Path tick;
+        tick.startNewSubPath (centre + d * (radius - 1.6f * u));
+        tick.lineTo (centre + d * (radius - 3.0f * u));
+        g.setColour (body.withMultipliedAlpha (0.6f));
+        g.strokePath (tick, juce::PathStrokeType (1.1f * u, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+
+    // Aiguille (couleur d'accent), pointée vers ~ 2 h
+    {
+        const float a = juce::degreesToRadians (60.0f);
+        const juce::Point<float> d (std::sin (a), -std::cos (a));
+        juce::Path hand;
+        hand.startNewSubPath (centre);
+        hand.lineTo (centre + d * (radius - 2.4f * u));
+        g.setColour (T.accent);
+        g.strokePath (hand, juce::PathStrokeType (1.7f * u, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.fillEllipse (juce::Rectangle<float> (2.8f * u, 2.8f * u).withCentre (centre));
+    }
+}

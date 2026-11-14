@@ -580,6 +580,12 @@ void TimeAudioProcessorEditor::paint (juce::Graphics& g)
     // Carte principale
     drawCard (unit (16, 16, 408, 248));
 
+    // Logo chronomètre + nom du plugin (en haut à gauche)
+    drawStopwatchLogo (g, unit (28, 25, 26, 26), T);
+    g.setColour (T.text);
+    g.setFont (uiFont (15.0f * s, FontWeight::Medium));
+    g.drawText ("Time", unit (58, 26, 80, 24), juce::Justification::centredLeft, false);
+
     // Légende
     g.setColour (themeFor (*this).secondary);
     g.setFont (uiFont (10.5f * s, FontWeight::Medium));

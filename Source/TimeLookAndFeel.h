@@ -68,6 +68,10 @@ private:
 const Theme& themeFor (const juce::Component& c);
 
 //==============================================================================
+/** Logo : chronomètre stylisé (fixe), dessiné en vectoriel dans 'area' (carré). */
+void drawStopwatchLogo (juce::Graphics&, juce::Rectangle<float> area, const Theme&);
+
+//==============================================================================
 //  Textures (générées une fois, puis mises en cache par l'éditeur)
 namespace Texture
 {
