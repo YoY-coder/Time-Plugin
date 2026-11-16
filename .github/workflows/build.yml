@@ -28,7 +28,8 @@ jobs:
           path: Time-Windows-VST3.zip
 
   macos:
-    runs-on: macos-latest
+    runs-on: macos-14
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - name: Configurer
@@ -44,8 +45,11 @@ jobs:
           name: Time-macOS-VST3
           path: Time-macOS-VST3.zip
 
+  # Publie dès que Windows est prêt, même si la machine Mac de GitHub est
+  # indisponible (le fichier Mac est alors ajouté quand il réussit).
   release:
     needs: [ windows, macos ]
+    if: always() && (needs.windows.result == 'success' || needs.macos.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -64,4 +68,5 @@ jobs:
           files: |
             Time-Windows-VST3.zip
             Time-macOS-VST3.zip
+          fail_on_unmatched_files: false
           make_latest: true
