@@ -1,0 +1,67 @@
+# Compile automatiquement Time.vst3 pour Windows et macOS à chaque envoi de code,
+# puis publie les deux fichiers ZIP dans la page "Releases" du dépôt.
+name: Build VST3
+
+on:
+  push:
+    branches: [ main, master, ccr-c08becc6-71lnzr ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configurer
+        run: cmake -B build -A x64
+      - name: Compiler
+        run: cmake --build build --config Release
+      - name: Empaqueter
+        shell: pwsh
+        run: Compress-Archive -Path build/Time_artefacts/Release/VST3/Time.vst3 -DestinationPath Time-Windows-VST3.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Time-Windows-VST3
+          path: Time-Windows-VST3.zip
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configurer
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Compiler (universel Intel + Apple Silicon, signé ad-hoc)
+        run: cmake --build build --config Release -j 4
+      - name: Vérifier la signature
+        run: codesign -dv build/Time_artefacts/Release/VST3/Time.vst3
+      - name: Empaqueter
+        run: ditto -c -k --keepParent build/Time_artefacts/Release/VST3/Time.vst3 Time-macOS-VST3.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Time-macOS-VST3
+          path: Time-macOS-VST3.zip
+
+  release:
+    needs: [ windows, macos ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - name: Publier dans Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-build
+          name: Time — dernière version compilée
+          body: |
+            Plugin Time compilé automatiquement à partir de la dernière version du code.
+            - Windows : Time-Windows-VST3.zip
+            - Mac (Intel + Apple Silicon) : Time-macOS-VST3.zip
+            Voir le README pour l'installation.
+          files: |
+            Time-Windows-VST3.zip
+            Time-macOS-VST3.zip
+          make_latest: true
