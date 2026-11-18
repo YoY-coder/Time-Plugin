@@ -28,7 +28,7 @@ jobs:
           path: Time-Windows-VST3.zip
 
   macos:
-    runs-on: macos-14
+    runs-on: macos-latest
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
