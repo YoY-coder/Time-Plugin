@@ -371,6 +371,11 @@ void ThemeToggle::paintButton (juce::Graphics& g, bool isMouseOver, bool isButto
 TimeAudioProcessorEditor::TimeAudioProcessorEditor (TimeAudioProcessor& p)
     : AudioProcessorEditor (&p), processor (p)
 {
+    // Lire la taille mémorisée AVANT toute mise en place : setResizable() et
+    // setResizeLimits() redimensionnent la fenêtre (à la taille minimale), ce qui
+    // appelle resized() et écraserait la taille sauvegardée dans le processeur.
+    const auto remembered = processor.getSavedEditorSize();
+
     darkMode = processor.isDarkMode();
     lookAndFeel.setDarkMode (darkMode);
     setLookAndFeel (&lookAndFeel);
@@ -407,8 +412,11 @@ TimeAudioProcessorEditor::TimeAudioProcessorEditor (TimeAudioProcessor& p)
     // Taille mémorisée dans le projet, redimensionnable par le coin
     setResizable (true, true);
     updateResizeLimits();
-    const auto size = processor.getSavedEditorSize();
-    setSize (size.x, size.y);
+    setSize (juce::jlimit (330, 2400, remembered.x), juce::jlimit (210, 1600, remembered.y));
+
+    // À partir d'ici seulement, les changements de taille sont mémorisés.
+    sizeReady = true;
+    resized();
 
     startTimerHz (10);   // rafraîchissement ~10 fois par seconde
 }
@@ -516,7 +524,7 @@ void TimeAudioProcessorEditor::resized()
     origin = { (w - baseWidth * scale) * 0.5f, (h - baseH * scale) * 0.5f };
 
     // Mémorise la taille (repliée) dans le projet
-    if (! applyingSize)
+    if (sizeReady && ! applyingSize)
     {
         const int collapsedH = expanded ? juce::roundToInt (h * baseHeightCollapsed / baseHeightExpanded) : (int) h;
         processor.setSavedEditorSize ((int) w, collapsedH);

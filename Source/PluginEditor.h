@@ -133,6 +133,7 @@ private:
 
     bool expanded = false;
     bool applyingSize = false;
+    bool sizeReady = false;   // false pendant la construction : on ne mémorise pas la taille
     float scale = 1.0f;
     juce::Point<float> origin;
     bool darkMode = false;
